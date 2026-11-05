@@ -1,0 +1,36 @@
+IntegraSoma Rechnungen – Einrichtung als Web-App
+================================================
+
+A) Auf GitHub hochladen (einmalig)
+1. github.com öffnen, oben rechts "+" > "New repository".
+2. Name: integrasoma-rechnungen, Sichtbarkeit "Public", "Create repository".
+3. "uploading an existing file" anklicken.
+4. ALLE Dateien aus diesem Ordner hineinziehen (nicht den Ordner selbst),
+   unten "Commit changes".
+5. Settings > Pages > Branch "main" / "/(root)" > Save.
+6. Nach 1–2 Minuten ist die App erreichbar unter:
+   https://wunderlichmediawo.github.io/integrasoma-rechnungen/
+
+B) Als App installieren (pro Rechner einmalig, nur mit Google Chrome)
+1. Den Link in Chrome öffnen.
+2. Rechts in der Adressleiste auf das Symbol "Installieren" klicken
+   (oder Menü ⋮ > "Streamen, speichern und teilen" > "Seite als App installieren").
+3. Die App liegt danach im Dock / Launchpad und startet in eigenem Fenster,
+   auch ohne Internet.
+
+C) Automatische Sicherung (einmalig)
+1. Im Finder einen Ordner anlegen, z. B. iCloud Drive/IntegraSoma/Sicherungen.
+2. In der App: Einstellungen > "Sicherungsordner wählen und automatisch sichern".
+3. Ordner auswählen und bei der Chrome-Abfrage "Bei jedem Besuch zulassen" wählen.
+   Fragt Chrome später erneut, links unten auf "Sicherung freigeben" klicken.
+
+D) Rechnungen als PDF
+Rechnung > "Drucken oder als PDF sichern" > im Druckfenster "Als PDF sichern"
+und z. B. iCloud Drive/IntegraSoma/Rechnungen/2026 wählen.
+
+Hinweise
+- Kundendaten werden NICHT hochgeladen. Online liegt nur das leere Programm.
+- Jeder Rechner hat seine eigenen Daten. Umzug: Einstellungen > "Sicherung
+  einspielen" und die Datei "...-Sicherung-aktuell.json" auswählen.
+- Updates: geänderte Dateien erneut auf GitHub hochladen, die App holt sie
+  beim nächsten Start mit Internet automatisch.
