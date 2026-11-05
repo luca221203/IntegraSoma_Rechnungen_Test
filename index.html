@@ -20,20 +20,21 @@
   --bg:#F6F4EC; --surface:#FFFCF5; --raised:#FFFFFF; --ink:#1E2320; --muted:#666F63;
   --line:#DDE0D5; --sage:#80927A; --sage-strong:#5E6F58; --sage-wash:#E9EDE5;
   --wine:#711322; --wine-wash:#F5E7E9; --copper:#B6875B; --focus:#711322;
+  --wine-line:#E3BFC5; --ok:#4E6B47; --ok-wash:#E6EEE2; --ok-line:#BFD0B8;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#161916; --surface:#1D211D; --raised:#232823; --ink:#ECEDE6; --muted:#A2A99E;
     --line:#353B34; --sage:#93A58C; --sage-strong:#B6C6AF; --sage-wash:#283027;
-    --wine:#E08C9A; --wine-wash:#3A2226; --copper:#C99C74; --focus:#E08C9A;
+    --wine:#E08C9A; --wine-wash:#3A2226; --copper:#C99C74; --focus:#E08C9A; --wine-line:#6A3740; --ok:#A9C79F; --ok-wash:#25332A; --ok-line:#45604A;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#161916; --surface:#1D211D; --raised:#232823; --ink:#ECEDE6; --muted:#A2A99E;
   --line:#353B34; --sage:#93A58C; --sage-strong:#B6C6AF; --sage-wash:#283027;
-  --wine:#E08C9A; --wine-wash:#3A2226; --copper:#C99C74; --focus:#E08C9A;
+  --wine:#E08C9A; --wine-wash:#3A2226; --copper:#C99C74; --focus:#E08C9A; --wine-line:#6A3740; --ok:#A9C79F; --ok-wash:#25332A; --ok-line:#45604A;
   color-scheme:dark;
 }
 
@@ -77,7 +78,18 @@ h2{font-weight:500;font-size:17px;margin:0 0 12px}
 .btn.link{border:none;background:none;padding:4px 6px;color:var(--sage-strong);font-weight:500}
 .btn.link:hover{text-decoration:underline}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
-.row-actions{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.row-actions .grp{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.act{border:1px solid var(--line);background:var(--raised);color:var(--ink);border-radius:7px;padding:4px 10px;font-size:13px;font-weight:400;line-height:1.35;cursor:pointer;white-space:nowrap;box-shadow:0 1px 0 rgba(30,35,32,.06)}
+.act:hover{border-color:var(--sage);background:var(--sage-wash);color:var(--sage-strong)}
+.act:active{transform:translateY(1px);box-shadow:none}
+.act.ok{border-color:var(--ok-line);color:var(--ok)}
+.act.ok:hover{background:var(--ok-wash);border-color:var(--ok)}
+.act.danger{color:var(--wine);border-color:var(--wine-line)}
+.act.danger:hover{background:var(--wine-wash);border-color:var(--wine);color:var(--wine)}
+.due{white-space:nowrap;font-size:13.5px}
+.due small{display:block;color:var(--muted);font-size:12px}
+.due.late{color:var(--wine);font-weight:500}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px}
 .stack{display:flex;flex-direction:column;gap:22px}
@@ -101,9 +113,9 @@ table.list .nowrap{white-space:nowrap}
 .empty p{margin:0 0 14px}
 
 .badge{display:inline-block;font-size:12px;font-weight:500;padding:2px 9px;border-radius:20px;white-space:nowrap}
-.b-offen{background:var(--sage-wash);color:var(--sage-strong)}
-.b-ueberfaellig{background:var(--wine-wash);color:var(--wine)}
-.b-bezahlt{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.b-offen{background:var(--wine-wash);color:var(--wine);border:1px solid var(--wine-line)}
+.b-ueberfaellig{background:var(--wine);color:#FFFCF5;border:1px solid var(--wine)}
+.b-bezahlt{background:var(--ok-wash);color:var(--ok);border:1px solid var(--ok-line)}
 .b-storniert,.b-storno{background:transparent;color:var(--muted);border:1px dashed var(--line)}
 
 .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
@@ -641,18 +653,28 @@ function render(opts){
 
 function invoiceRows(list){
   if(!list.length) return '';
-  return `<div class="table-wrap"><table class="list"><thead><tr><th>Nummer</th><th>Datum</th><th>Kunde</th><th class="num">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
+  return `<div class="table-wrap"><table class="list"><thead><tr><th>Nummer</th><th>Datum</th><th>Kunde</th><th class="num">Betrag</th><th>Status</th><th>Fällig / bezahlt am</th><th></th></tr></thead><tbody>
   ${list.map(r => {
     const s = status(r), t = totals(r.positionen, r.mwst, r.typ==='storno'?-1:1);
-    let acts = `<button class="btn link" data-act="show" data-id="${r.id}">Ansehen</button>`;
-    if(s==='offen'||s==='ueberfaellig') acts += `<button class="btn link" data-act="paid" data-id="${r.id}">Bezahlt</button><button class="btn link" data-act="remind" data-id="${r.id}">Erinnern</button>`;
-    if(s==='bezahlt') acts += `<button class="btn link" data-act="unpaid" data-id="${r.id}">Zahlung zurücknehmen</button>`;
-    if(r.typ!=='storno') acts += `<button class="btn link" data-act="copy" data-id="${r.id}">Kopieren</button>`;
-    if(s==='offen'||s==='ueberfaellig'||s==='bezahlt') acts += `<button class="btn link" data-act="storno" data-id="${r.id}" style="color:var(--wine)">Stornieren</button>`;
-    const extra = s==='bezahlt' && r.bezahltAm ? `<div class="muted" style="font-size:12.5px">am ${dShort(r.bezahltAm)}</div>`
-      : (r.mahnungen && r.mahnungen.length && (s==='offen'||s==='ueberfaellig')) ? `<div class="muted" style="font-size:12.5px">${r.mahnungen.length}× erinnert</div>`
-      : (s==='offen') ? `<div class="muted" style="font-size:12.5px">fällig ${dShort(dueDate(r))}</div>` : '';
-    return `<tr><td class="nowrap">${esc(r.nr)}</td><td class="nowrap">${dShort(r.datum)}</td><td>${esc(kundeName(r.kunde))}</td><td class="num">${eur(t.total)}</td><td>${badge(s)}${extra}</td><td><div class="row-actions">${acts}</div></td></tr>`;
+    const A = (act, label, cls='') => `<button class="act ${cls}" data-act="${act}" data-id="${r.id}">${label}</button>`;
+    let top = A('show','Ansehen');
+    if(s==='offen'||s==='ueberfaellig') top += A('paid','Bezahlt','ok') + A('remind','Erinnern');
+    if(s==='bezahlt') top += A('unpaid','Zahlung zurücknehmen');
+    if(r.typ!=='storno') top += A('copy','Kopieren');
+    const bottom = (s==='offen'||s==='ueberfaellig'||s==='bezahlt') ? A('storno','Stornieren','danger') : '';
+    let due = '';
+    if(s==='offen' || s==='ueberfaellig'){
+      const mn = (r.mahnungen||[]).length;
+      due = `<div class="due${s==='ueberfaellig'?' late':''}"><small>fällig am</small>${dShort(dueDate(r))}${mn ? `<small>${mn}× erinnert</small>` : ''}</div>`;
+    } else if(s==='bezahlt'){
+      due = `<div class="due"><small>bezahlt am</small>${r.bezahltAm ? dShort(r.bezahltAm) : '–'}</div>`;
+    } else if(s==='storniert'){
+      due = `<div class="due muted"><small>storniert durch</small>${esc(r.stornoNr||'')}</div>`;
+    } else if(s==='storno'){
+      due = `<div class="due muted"><small>storniert</small>${esc(r.stornoVon||'')}</div>`;
+    }
+    return `<tr><td class="nowrap">${esc(r.nr)}</td><td class="nowrap">${dShort(r.datum)}</td><td>${esc(kundeName(r.kunde))}</td><td class="num">${eur(t.total)}</td><td>${badge(s)}</td><td>${due}</td>
+      <td><div class="row-actions"><div class="grp">${top}</div>${bottom ? `<div class="grp">${bottom}</div>` : ''}</div></td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 const sorted = () => S.rechnungen.slice().sort((a,b) => (b.datum+b.created).localeCompare(a.datum+a.created));
