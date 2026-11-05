@@ -1,9 +1,8 @@
 /* Sorgt dafür, dass die App auch ohne Internet startet.
    Bei jeder neuen Version die Zahl erhöhen. */
-const CACHE = 'rechnungen-v2';
+const CACHE = 'rechnungen-v3';
 const FILES = ['./', './index.html', './config.js', './logo.svg', './manifest.webmanifest',
-  './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png',
-  './vendor/jspdf.umd.min.js', './pdf-fonts.js'];
+  './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
