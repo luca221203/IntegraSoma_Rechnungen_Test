@@ -128,6 +128,10 @@ label.f textarea{min-height:70px;resize:vertical}
 .pos{display:grid;grid-template-columns:minmax(0,1.1fr) 76px minmax(0,1fr) 34px;gap:8px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--raised)}
 .pos .full{grid-column:1 / -1}.pos .w3{grid-column:1 / 4}
 .pos small{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.pos .pair{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.dgrid label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.dgrid span{min-width:20px;text-align:right}
 .x{all:unset;cursor:pointer;width:34px;height:36px;display:grid;place-items:center;border-radius:8px;color:var(--muted);font-size:18px}
 .x:hover{background:var(--wine-wash);color:var(--wine)}
 .x:focus-visible{outline:2px solid var(--focus)}
@@ -156,6 +160,10 @@ label.f textarea{min-height:70px;resize:vertical}
 .page .pg-table tr.total td{border-top:1.2pt solid #80927A;font-weight:500}
 .page .pg-pay{margin-top:30pt}
 .page .ph{color:#9AA394}
+.page.compact .pg-title{margin-bottom:22pt}
+.page.compact .pg-head{margin-bottom:22pt}
+.page.compact .pg-pay{margin-top:20pt}
+.page.compact .pg-table th,.page.compact .pg-table td{padding-top:2pt;padding-bottom:2pt}
 
 dialog{border:none;border-radius:14px;padding:0;background:var(--surface);color:var(--ink);max-width:min(560px,calc(100vw - 32px));width:100%;box-shadow:0 20px 60px -20px rgba(0,0,0,.45)}
 dialog.wide{max-width:min(760px,calc(100vw - 32px))}
@@ -245,6 +253,7 @@ function load(){
       S.settings = Object.assign(defaults().settings, d.settings || {});
     } else S = defaults();
   }catch(e){ storageOK = false; S = defaults(); }
+  migrate();
 }
 function persist(){
   try{ localStorage.setItem(KEY, JSON.stringify(S)); storageOK = true; }
@@ -277,8 +286,36 @@ function totals(pos, mwst, sign=1){
   return {net, vat, total:r2(net+vat)};
 }
 function numberKey(iso){ const [y,m]=iso.split('-'); return m+'/'+y; }
-function peekNumber(iso){ const k=numberKey(iso); return k+' - '+((S.counters[k]||0)+1); }
-function takeNumber(iso){ const k=numberKey(iso); S.counters[k]=(S.counters[k]||0)+1; return k+' - '+S.counters[k]; }
+const monthly = () => !!S.settings.zaehlerMonatlich;
+function nextSeq(iso){ return monthly() ? (S.counters[numberKey(iso)]||0)+1 : S.nextNr; }
+function peekNumber(iso){ return numberKey(iso)+' - '+nextSeq(iso); }
+function trailingInt(nr){ const m = String(nr).match(/(\d+)\s*$/); return m ? parseInt(m[1],10) : null; }
+function commitNumber(nr, iso){
+  const n = trailingInt(nr); if(n===null) return;
+  if(monthly()){ const k = numberKey(iso); S.counters[k] = Math.max(S.counters[k]||0, n); }
+  else S.nextNr = Math.max(S.nextNr, n+1);
+}
+function takeNumber(iso){ const nr = peekNumber(iso); commitNumber(nr, iso); return nr; }
+function migrate(){
+  if(typeof S.nextNr!=='number' || !(S.nextNr>0)){
+    const ns = S.rechnungen.map(r => trailingInt(r.nr)).filter(n => n!==null);
+    S.nextNr = ns.length ? Math.max(...ns)+1 : 1;
+  }
+}
+/* Zeilen auf der Rechnung: bei mehreren Sitzungen je Sitzung eine Zeile */
+function splitDates(p){
+  const m = num(p.menge||1);
+  return Array.isArray(p.daten) && Number.isInteger(m) && m>=2 && p.daten.length===m;
+}
+function docRows(pos){
+  const out = [];
+  pos.forEach(p => {
+    const m = num(p.menge||1);
+    if(splitDates(p)) p.daten.forEach(d => out.push({text:p.text, datum:d, betrag:num(p.netto)}));
+    else out.push({text:(m!==1 ? m.toLocaleString('de-DE')+' × ' : '') + (p.text||''), datum:p.datum, betrag:m*num(p.netto)});
+  });
+  return out;
+}
 function dueDate(r){
   if(r.mahnungen && r.mahnungen.length) return addDays(r.mahnungen[r.mahnungen.length-1], S.settings.mahnfrist);
   return addDays(r.datum, r.zahlungsziel);
@@ -313,14 +350,12 @@ function docHTML(o){
   ].filter(Boolean);
   const adr = lines.map(x => `<p>${x}</p>`).join('');
   const angaben = o.angaben.map(([l,v],i) => i===0 ? `<p class="m">${esc(l)}</p>` : `<p>${esc(l)}: ${esc(v)}</p>`).join('');
-  let middle = '';
+  let middle = '', compact = false;
   if(o.positionen){
     const sign = o.sign || 1;
-    const rows = o.positionen.map(p => {
-      const m = num(p.menge||1);
-      const txt = (m!==1 ? (m.toLocaleString('de-DE')+' × ') : '') + (p.text||'');
-      return `<tr><td>${esc(txt)}</td><td>${esc(dShort(p.datum))}</td><td class="r">${eur(sign*m*num(p.netto))}</td></tr>`;
-    }).join('');
+    const dr = docRows(o.positionen);
+    if(dr.length > 6) compact = true;
+    const rows = dr.map(x => `<tr><td>${esc(x.text)}</td><td>${esc(dShort(x.datum))}</td><td class="r">${eur(sign*x.betrag)}</td></tr>`).join('');
     const t = totals(o.positionen, o.mwst, sign);
     middle = `
     <table class="pg-table"><colgroup><col style="width:50%"><col style="width:22%"><col style="width:28%"></colgroup>
@@ -341,7 +376,7 @@ function docHTML(o){
       <div class="gap"></div>
       <p>${esc(o.zielText || ('Zahlungsziel: ' + st.zahlungsziel + ' Tage'))}</p>
     </div>`;
-  return `<div class="page">
+  return `<div class="page${compact?' compact':''}">
     <img class="pg-logo" src="${LOGO}" alt="">
     <div class="pg-body">
       <p class="pg-title">${esc(o.titel)}</p>
@@ -542,6 +577,12 @@ function vEinstellungen(m){
       <div class="grid3">${f('bank','Bank')}${f('iban','IBAN')}${f('bic','BIC')}</div>
       <h2 style="margin-top:22px">Rechnungen</h2>
       <div class="grid3">${f('mwst','MwSt. in %','number')}${f('zahlungsziel','Zahlungsziel in Tagen','number')}${f('mahnfrist','Frist bei Erinnerung in Tagen','number')}</div>
+      <h2 style="margin-top:22px">Rechnungsnummer</h2>
+      <div class="grid2">
+        <label class="f">Nächste laufende Nummer<input name="nextNr" type="number" min="1" step="1" value="${nextSeq(today())}"></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:10px;margin-top:22px;color:var(--ink)"><input type="checkbox" name="zaehlerMonatlich" ${s.zaehlerMonatlich?'checked':''} style="width:auto"> Jeden Monat wieder bei 1 beginnen</label>
+      </div>
+      <p class="hint">Format: Monat/Jahr - laufende Nummer. Die nächste Rechnung erhält <strong id="nrPreview" style="font-weight:500">${esc(peekNumber(today()))}</strong>. Haben Sie bisher schon Rechnungen geschrieben, tragen Sie hier die nächste freie Nummer ein, zum Beispiel 50.</p>
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="btn primary" type="submit">Einstellungen speichern</button></div>
     </form>
     <div class="panel">
@@ -560,8 +601,14 @@ function vEinstellungen(m){
   $('#setForm').addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    for(const [k,v] of fd.entries()) s[k] = ['mwst','zahlungsziel','mahnfrist'].includes(k) ? num(v) : String(v).trim();
-    save(); toast('Einstellungen gespeichert');
+    for(const [k,v] of fd.entries()){
+      if(k==='nextNr' || k==='zaehlerMonatlich') continue;
+      s[k] = ['mwst','zahlungsziel','mahnfrist'].includes(k) ? num(v) : String(v).trim();
+    }
+    s.zaehlerMonatlich = fd.has('zaehlerMonatlich');
+    const n = parseInt(fd.get('nextNr'),10);
+    if(n>0){ if(s.zaehlerMonatlich) S.counters[numberKey(today())] = n-1; else S.nextNr = n; }
+    save(); toast('Einstellungen gespeichert'); render();
   });
   $('#restoreFile').addEventListener('change', restoreFile);
 }
@@ -571,7 +618,7 @@ let draft = null;
 function newDraft(from){
   const d = today();
   draft = {kundeId: from?.kundeId || '', datum:d, positionen:[]};
-  if(from && from.positionen) draft.positionen = from.positionen.map(p => ({...p, datum:d}));
+  if(from && from.positionen) draft.positionen = from.positionen.map(p => { const q = {...p, datum:d}; if(Array.isArray(p.daten)) q.daten = p.daten.map((_,k) => k===0 ? d : ''); return q; });
   else if(S.leistungen.length===1) draft.positionen = [{leistungId:S.leistungen[0].id, text:S.leistungen[0].name, netto:S.leistungen[0].netto, menge:1, datum:d}];
   else draft.positionen = [{leistungId:'', text:'', netto:'', menge:1, datum:d}];
 }
@@ -590,7 +637,8 @@ function vNeu(m, opts){
               <div style="display:flex;gap:8px"><select id="dKunde"><option value="">Kunden auswählen</option>${kOpts}</select><button class="btn" type="button" data-act="kunde-neu-draft" style="white-space:nowrap">Neu</button></div>
             </label>
             <label class="f">Rechnungsdatum<input type="date" id="dDatum" value="${draft.datum}"></label>
-            <label class="f">Rechnungsnummer<input type="text" value="${esc(peekNumber(draft.datum))}" readonly aria-readonly="true" id="dNr"></label>
+            <label class="f">Rechnungsnummer<input type="text" value="${esc(draft.nr || peekNumber(draft.datum))}" id="dNr" autocomplete="off"></label>
+            <p class="hint span2" id="dNrHint" style="margin:-4px 0 0"></p>
           </div>
         </div>
         <div class="panel">
@@ -612,10 +660,23 @@ function vNeu(m, opts){
       <div class="desk"><p class="cap"><span>Vorschau</span><span id="dCount"></span></p><div class="paper" id="dPaper"></div></div>
     </div>`;
   $('#dKunde').addEventListener('change', e => { draft.kundeId = e.target.value; updatePreview(); });
-  $('#dDatum').addEventListener('change', e => { draft.datum = e.target.value || today(); $('#dNr').value = peekNumber(draft.datum); updatePreview(); });
+  $('#dDatum').addEventListener('change', e => { draft.datum = e.target.value || today(); if(!draft.nr) $('#dNr').value = peekNumber(draft.datum); updatePreview(); });
+  $('#dNr').addEventListener('input', e => { const v = e.target.value.trim(); draft.nr = (v===peekNumber(draft.datum)) ? '' : v; updatePreview(); });
   renderPos();
 }
-const MAXPOS = 6;
+const MAXROWS = 10;
+function datesHTML(p, i){
+  if(splitDates(p)) return `<small>Datum der einzelnen Sitzungen</small><div class="dgrid">${p.daten.map((d,k) => `<label><span>${k+1}.</span><input type="date" data-d="${k}" data-i="${i}" value="${d||''}" aria-label="Datum der ${k+1}. Sitzung"></label>`).join('')}</div>`;
+  return `<small>Datum der Leistung</small><input type="date" data-f="datum" value="${p.datum||''}">`;
+}
+function syncDaten(p){
+  const m = num(p.menge||1);
+  if(Number.isInteger(m) && m>=2 && m<=MAXROWS){
+    const old = Array.isArray(p.daten) ? p.daten : [p.datum||''];
+    p.daten = Array.from({length:m}, (_,k) => old[k] || (k===0 ? (p.datum||'') : ''));
+    p.datum = p.daten[0] || p.datum;
+  } else { if(Array.isArray(p.daten) && p.daten[0]) p.datum = p.daten[0]; delete p.daten; }
+}
 function renderPos(){
   const lOpts = id => `<option value="">Freie Eingabe</option>` + S.leistungen.map(l => `<option value="${l.id}" ${l.id===id?'selected':''}>${esc(l.name)}</option>`).join('');
   $('#posList').innerHTML = draft.positionen.map((p,i) => `
@@ -623,13 +684,16 @@ function renderPos(){
       <label class="f w3"><small>Leistung</small><select data-f="leistungId">${lOpts(p.leistungId)}</select></label>
       <button class="x" type="button" data-act="pos-del" data-i="${i}" aria-label="Leistung entfernen" ${draft.positionen.length===1?'disabled style="visibility:hidden"':''}>×</button>
       <label class="f full"><small>Bezeichnung auf der Rechnung</small><input data-f="text" value="${esc(p.text)}"></label>
-      <label class="f"><small>Datum der Leistung</small><input type="date" data-f="datum" value="${p.datum||''}"></label>
-      <label class="f"><small>Anzahl</small><input data-f="menge" inputmode="decimal" value="${esc(String(p.menge??1).replace('.',','))}"></label>
-      <label class="f"><small>Preis netto</small><input data-f="netto" inputmode="decimal" value="${p.netto===''?'':esc(numIn(p.netto))}"></label>
+      <div class="full pair">
+        <label class="f qty"><small>Anzahl</small><input data-f="menge" inputmode="decimal" value="${esc(String(p.menge??1).replace('.',','))}"></label>
+        <label class="f"><small>Preis netto je Einheit</small><input data-f="netto" inputmode="decimal" value="${p.netto===''?'':esc(numIn(p.netto))}"></label>
+      </div>
+      <div class="f dates full" data-dates="${i}">${datesHTML(p,i)}</div>
     </div>`).join('');
   $$('#posList .pos').forEach(row => {
     const i = Number(row.dataset.i);
-    row.querySelectorAll('[data-f]').forEach(inp => {
+    bindDates(row.querySelector('[data-dates]'), draft.positionen[i]);
+    row.querySelectorAll('[data-f]:not([data-f="datum"])').forEach(inp => {
       const ev = inp.tagName==='SELECT' || inp.type==='date' ? 'change' : 'input';
       inp.addEventListener(ev, () => {
         const f = inp.dataset.f, p = draft.positionen[i];
@@ -638,7 +702,11 @@ function renderPos(){
           const l = S.leistungen.find(x => x.id===inp.value);
           if(l){ p.text = l.name; p.netto = l.netto; row.querySelector('[data-f="text"]').value = l.name; row.querySelector('[data-f="netto"]').value = numIn(l.netto); }
         } else if(f==='netto') p.netto = inp.value.trim()==='' ? '' : num(inp.value);
-        else if(f==='menge') p.menge = inp.value.trim()==='' ? 1 : num(inp.value);
+        else if(f==='menge'){
+          p.menge = inp.value.trim()==='' ? 1 : num(inp.value);
+          syncDaten(p);
+          const box = row.querySelector('[data-dates]'); box.innerHTML = datesHTML(p,i); bindDates(box, p);
+        }
         else p[f] = inp.value;
         updatePreview();
       });
@@ -646,15 +714,24 @@ function renderPos(){
   });
   updatePreview();
 }
+function bindDates(box, p){
+  box.querySelectorAll('[data-d]').forEach(inp => inp.addEventListener('change', () => { p.daten[Number(inp.dataset.d)] = inp.value; if(inp.dataset.d==='0') p.datum = inp.value; updatePreview(); }));
+  const single = box.querySelector('[data-f="datum"]');
+  if(single) single.addEventListener('change', () => { p.datum = single.value; updatePreview(); });
+}
 function draftKunde(){ return S.kunden.find(k => k.id===draft.kundeId) || {}; }
 function updatePreview(){
   const pos = draft.positionen.filter(p => p.text || p.netto!=='');
   const t = totals(pos, S.settings.mwst);
   $('#dTotals').innerHTML = `<span class="muted">Netto</span><span>${eur(t.net)}</span><span class="muted">MwSt. ${S.settings.mwst} %</span><span>${eur(t.vat)}</span><span class="g">Gesamt</span><span class="g">${eur(t.total)}</span>`;
-  $('#dCount').textContent = draft.positionen.length + ' von ' + MAXPOS + ' Zeilen';
+  const nrows = docRows(pos).length;
+  $('#dCount').textContent = nrows + ' von ' + MAXROWS + ' Zeilen';
+  $('#dCount').style.color = nrows > MAXROWS ? 'var(--wine)' : '';
+  const sugg = peekNumber(draft.datum);
+  $('#dNrHint').textContent = draft.nr ? `Automatischer Vorschlag wäre ${sugg}. Ab Ihrer Nummer wird danach weitergezählt.` : 'Wird automatisch fortlaufend vergeben. Bei Bedarf einfach überschreiben.';
   mountPaper($('#dPaper'), docHTML({
     preview:true, titel:CFG.docTitle, kunde:draftKunde(), mwst:S.settings.mwst, positionen:pos.length?pos:[{text:'',datum:'',netto:0}],
-    angaben:[['Rechnungsangaben'],['Rechnungsnummer',peekNumber(draft.datum)],['Rechnungsdatum',dShort(draft.datum)]]
+    angaben:[['Rechnungsangaben'],['Rechnungsnummer',draft.nr || peekNumber(draft.datum)],['Rechnungsdatum',dShort(draft.datum)]]
   }));
 }
 function saveDraft(){
@@ -663,12 +740,21 @@ function saveDraft(){
   if(!k.id){ err.textContent = 'Bitte wählen Sie einen Kunden aus.'; $('#dKunde').focus(); return; }
   const pos = draft.positionen.filter(p => p.text || p.netto!=='');
   if(!pos.length){ err.textContent = 'Bitte tragen Sie mindestens eine Leistung ein.'; return; }
-  const bad = pos.findIndex(p => !p.text || p.netto==='' || !p.datum);
-  if(bad>-1){ err.textContent = `In Zeile ${bad+1} fehlt ${!pos[bad].text?'die Bezeichnung':(pos[bad].netto===''?'der Preis':'das Datum der Leistung')}.`; return; }
+  const bad = pos.findIndex(p => !p.text || p.netto==='' || (splitDates(p) ? p.daten.some(d => !d) : !p.datum));
+  if(bad>-1){
+    const p = pos[bad];
+    const miss = !p.text ? 'die Bezeichnung' : p.netto==='' ? 'der Preis' : splitDates(p) ? `das Datum der ${p.daten.findIndex(d=>!d)+1}. Sitzung` : 'das Datum der Leistung';
+    err.textContent = `Bei Leistung ${bad+1} fehlt ${miss}.`; return;
+  }
+  if(docRows(pos).length > MAXROWS){ err.textContent = `Auf eine Seite passen höchstens ${MAXROWS} Zeilen. Bitte die Leistungen auf zwei Rechnungen verteilen.`; return; }
+  const nr = (draft.nr || peekNumber(draft.datum)).trim();
+  if(!nr){ err.textContent = 'Bitte geben Sie eine Rechnungsnummer ein.'; $('#dNr').focus(); return; }
+  if(S.rechnungen.some(x => x.nr===nr)){ err.textContent = `Die Rechnungsnummer ${nr} gibt es bereits. Bitte eine andere wählen.`; $('#dNr').focus(); return; }
+  commitNumber(nr, draft.datum);
   const r = {
-    id:uid(), typ:'rechnung', nr:takeNumber(draft.datum), datum:draft.datum, created:new Date().toISOString(),
+    id:uid(), typ:'rechnung', nr, datum:draft.datum, created:new Date().toISOString(),
     kundeId:k.id, kunde:{...k}, settings:{...S.settings}, mwst:S.settings.mwst, zahlungsziel:S.settings.zahlungsziel,
-    positionen:pos.map(p => ({text:p.text, datum:p.datum, menge:num(p.menge||1), netto:num(p.netto)})),
+    positionen:pos.map(p => { const o = {text:p.text, datum:splitDates(p)?p.daten[0]:p.datum, menge:num(p.menge||1), netto:num(p.netto)}; if(splitDates(p)) o.daten = p.daten.slice(); return o; }),
     status:'offen', bezahltAm:null, mahnungen:[]
   };
   S.rechnungen.push(r); save();
@@ -863,7 +949,7 @@ function restoreFile(e){
       if(!d || !Array.isArray(d.rechnungen) || !Array.isArray(d.kunden)) throw new Error('format');
       const ok = await confirmDlg('Sicherung einspielen?', `Die Sicherung enthält ${d.kunden.length} Kunden und ${d.rechnungen.length} Rechnungen. Die aktuellen Daten in diesem Browser werden dadurch ersetzt.`, 'Sicherung einspielen', true);
       if(!ok) return;
-      S = Object.assign(defaults(), d); S.settings = Object.assign(defaults().settings, d.settings||{});
+      S = Object.assign(defaults(), d); S.settings = Object.assign(defaults().settings, d.settings||{}); delete S.nextNr; if(typeof d.nextNr==='number') S.nextNr = d.nextNr; migrate();
       save(); toast('Sicherung eingespielt'); go('start');
     }catch(err){ toast('Diese Datei ist keine gültige Sicherung.'); }
     e.target.value = '';
@@ -908,7 +994,7 @@ document.addEventListener('click', async e => {
         S.leistungen = S.leistungen.filter(x => x.id!==id); save(); toast('Leistung gelöscht'); render();
       } break; }
     case 'pos-add':
-      if(draft.positionen.length >= MAXPOS){ $('#dErr').textContent = `Auf eine Seite passen höchstens ${MAXPOS} Leistungen. Für mehr bitte eine zweite Rechnung schreiben.`; break; }
+      if(docRows(draft.positionen).length >= MAXROWS){ $('#dErr').textContent = `Auf eine Seite passen höchstens ${MAXROWS} Zeilen. Für mehr bitte eine zweite Rechnung schreiben.`; break; }
       { const l = S.leistungen.length===1 ? S.leistungen[0] : null;
         draft.positionen.push({leistungId:l?l.id:'', text:l?l.name:'', netto:l?l.netto:'', menge:1, datum:draft.datum}); }
       renderPos(); break;
