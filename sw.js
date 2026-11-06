@@ -1,6 +1,6 @@
 /* Sorgt dafür, dass die App auch ohne Internet startet.
    Bei jeder neuen Version die Zahl erhöhen. */
-const CACHE = 'rechnungen-v3';
+const CACHE = 'rechnungen-v4';
 const FILES = ['./', './index.html', './config.js', './logo.svg', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
 

@@ -783,7 +783,7 @@ function docHTML(o){
       <div class="pg-head"><div>${adr}</div><div>${angaben}</div></div>
       ${text}${middle}${o.after ? '<div class="pg-pay">'+o.after.map(p=>p===''?'<div class="gap"></div>':`<p>${esc(p)}</p>`).join('')+'</div>' : ''}${pay}
     </div>
-    <div class="pg-foot" style="left:51.4pt"><p>${esc(st.strasse)}</p><p>${esc(st.ort)}</p></div>
+    <div class="pg-foot" style="left:51.4pt"><p>${esc(st.strasse)}</p><p>${esc(st.ort)}</p>${st.ustid ? `<p>${esc(CFG.ustidLabel||'USt-IdNr.')} ${esc(st.ustid)}</p>` : ''}</div>
     <div class="pg-foot" style="left:227.7pt"><p>${esc(st.email)}</p><p>${esc(st.web)}</p><p>${esc(st.tel)}</p></div>
     <div class="pg-foot" style="left:413.7pt"><p>${esc(st.bank)}</p><p>IBAN ${esc(st.iban)}</p><p>BIC ${esc(st.bic)}</p></div>
     <div class="pg-bar"></div>
@@ -872,7 +872,7 @@ async function buildPdf(o){
   doc.setFillColor(ACC); doc.rect(0, 822, 595.28, 20, 'F');
   // Fußzeile
   font('l', 8);
-  [[51.4,[st.strasse, st.ort]],[227.7,[st.email, st.web, st.tel]],[413.7,[st.bank,'IBAN '+st.iban,'BIC '+st.bic]]]
+  [[51.4,[st.strasse, st.ort].concat(st.ustid ? [(CFG.ustidLabel||'USt-IdNr.')+' '+st.ustid] : [])],[227.7,[st.email, st.web, st.tel]],[413.7,[st.bank,'IBAN '+st.iban,'BIC '+st.bic]]]
     .forEach(([x, ls]) => ls.forEach((t,i) => doc.text(String(t||''), x, base(742 + i*12, 12, 8))));
   // Inhalt
   const dr = o.positionen ? docRows(o.positionen) : [];
@@ -1158,7 +1158,7 @@ function vEinstellungen(m){
     <div class="stack">
     <form class="panel" id="setForm">
       <h2>Absender</h2>
-      <div class="grid2">${f('name','Name für Unterschrift')}${f('kontoinhaber','Kontoinhaber')}${f('strasse','Straße')}${f('ort','PLZ und Ort')}${f('email','E-Mail')}${f('web','Website')}${f('tel','Telefon (wie in der Fußzeile)','text','span2')}</div>
+      <div class="grid2">${f('name','Name für Unterschrift')}${f('kontoinhaber','Kontoinhaber')}${f('strasse','Straße')}${f('ort','PLZ und Ort')}${f('email','E-Mail')}${f('web','Website')}${f('tel','Telefon (wie in der Fußzeile)','text','span2')}${f('ustid',(CFG.ustidLabel||'USt-IdNr.')+' (erscheint in der Fußzeile, leer lassen wenn noch nicht vorhanden)','text','span2')}</div>
       <h2 style="margin-top:22px">Bank</h2>
       <div class="grid3">${f('bank','Bank')}${f('iban','IBAN')}${f('bic','BIC')}</div>
       <h2 style="margin-top:22px">Rechnungen</h2>

@@ -8,6 +8,8 @@ window.APP_CONFIG = {
   appName:    'IntegraSoma Rechnungen',
   brandName:  'IntegraSoma',
   logo:       'logo.svg',
+  /* Bezeichnung vor der Umsatzsteuer-Identifikationsnummer in der Fußzeile */
+  ustidLabel: 'USt-IdNr.',
   docTitle:   'HONORARRECHNUNG',
   filePrefix: 'IntegraSoma',
   /* Muss pro Kundin eindeutig sein, sonst teilen sich zwei Apps
@@ -23,6 +25,7 @@ window.APP_CONFIG = {
     email:        'S.KreutzLamm@IntegraSoma.lu',
     web:          'www.IntegraSoma.lu',
     tel:          'Tel. 00352 621 642 123',
+    ustid:        '',
     bank:         'Spuerkess',
     iban:         'LU33 0019 8255 5538 1000',
     bic:          'BCEELULL',
