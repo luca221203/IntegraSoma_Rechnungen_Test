@@ -34,3 +34,5 @@ Hinweise
   einspielen" und die Datei "...-Sicherung-aktuell.json" auswählen.
 - Updates: geänderte Dateien erneut auf GitHub hochladen, die App holt sie
   beim nächsten Start mit Internet automatisch.
+
+
